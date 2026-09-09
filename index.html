@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Demo: Client gửi input tới server local (Puppeteer)</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 20px; }
+  .row { display: flex; gap: 8px; margin-bottom: 16px; }
+  input { flex: 1; padding: 8px; font-size: 15px; }
+  button { padding: 8px 16px; font-size: 15px; cursor: pointer; }
+  #status { color: #555; margin-bottom: 12px; min-height: 20px; }
+  #results { list-style: none; padding: 0; }
+  #results li { padding: 10px 0; border-bottom: 1px solid #eee; }
+  #results a { color: #1a0dab; text-decoration: none; }
+  #results a:hover { text-decoration: underline; }
+  .note { color: #b00; font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1>Demo trình duyệt tìm kiếm (client → server local → Puppeteer)</h1>
+
+  <div class="row">
+    <input id="q" placeholder="Nhập nội dung cần tìm..." />
+    <button id="btn">Tìm kiếm</button>
+  </div>
+
+  <div id="status">Đang trỏ tới: <code id="server-url-display"></code></div>
+  <ul id="results"></ul>
+
+<script>
+  // ĐỔI dòng dưới thành URL thật sau khi deploy xong trên Render, ví dụ:
+  // "https://search-demo-abcd.onrender.com/search"
+  const SERVER_URL = "https://TEN-APP-CUA-MAY.onrender.com/search";
+
+  const btn = document.getElementById("btn");
+  const input = document.getElementById("q");
+  const status = document.getElementById("status");
+  const list = document.getElementById("results");
+
+  document.getElementById("server-url-display").textContent = SERVER_URL;
+
+  async function runSearch() {
+    const query = input.value.trim();
+    if (!query) return;
+
+    status.textContent = "Đang gửi lên server và chờ Puppeteer... (server free tier có thể mất 30-50s để \"thức dậy\" nếu đang ngủ)";
+    list.innerHTML = "";
+
+    try {
+      const res = await fetch(SERVER_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+
+      const data = await res.json();
+      console.log("Kết quả từ server:", data);
+
+      if (data.error) {
+        status.textContent = "Lỗi: " + data.error;
+        return;
+      }
+
+      if (data.results.length === 0) {
+        status.textContent = data.note || "Không có kết quả.";
+        return;
+      }
+
+      status.textContent = `Tìm thấy ${data.results.length} kết quả cho "${data.query}"`;
+      data.results.forEach((r) => {
+        const li = document.createElement("li");
+        const a = document.createElement("a");
+        a.href = r.link;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.textContent = r.title;
+        li.appendChild(a);
+        list.appendChild(li);
+      });
+    } catch (err) {
+      console.error(err);
+      status.textContent = "Không kết nối được server. Kiểm tra lại SERVER_URL trong code, hoặc server Render có đang bị sập/ngủ không.";
+    }
+  }
+
+  btn.addEventListener("click", runSearch);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runSearch();
+  });
+</script>
+</body>
+</html>
