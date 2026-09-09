@@ -93,6 +93,58 @@ app.listen(PORT, () => {
     // Thay cho waitForTimeout (đã bị xoá): chờ có thẻ h3 xuất hiện, không quăng lỗi nếu quá giờ
     await page.waitForSelector("h3", { timeout: 8000 }).catch(() => null);
 
+    // DEBUG tạm thời: in tiêu đề trang + 300 ký tự đầu ra Render Logs
+    // để biết Google có chặn/hiện captcha hay không. Xoá đoạn này sau khi debug xong.
+    const debugTitle = await page.title();
+    const debugSnippet = await page.evaluate(() => document.body.innerText.slice(0, 300));
+    console.log("DEBUG - Tiêu đề trang:", debugTitle);
+    console.log("DEBUG - Nội dung đầu trang:", debugSnippet);
+
+
+    const results = await page.evaluate(() => {
+      const items = [];
+      // Google hay đổi class layout theo thời gian/khu vực -> gom nhiều selector khả dĩ
+      const blocks = document.querySelectorAll("div.g, div.MjjYud, div.tF2Cxc");
+      blocks.forEach((block) => {
+        const titleEl = block.querySelector("h3");
+        const linkEl = block.querySelector("a[href]");
+        if (titleEl && linkEl) {
+          items.push({ title: titleEl.innerText, link: linkEl.href });
+        }
+      });
+      return items.slice(0, 10);
+    });
+
+    await browser.close();
+
+    if (results.length === 0) {
+      return res.json({
+        query,
+        results: [],
+        note: "Không lấy được kết quả — có thể Google chặn bot/hiện captcha, hoặc đổi layout DOM.",
+      });
+    }
+
+    res.json({ query, results });
+  } catch (err) {
+    if (browser) await browser.close();
+    console.error("Lỗi Puppeteer:", err);
+    res.status(500).json({ error: "Lỗi khi tìm kiếm", detail: err.message });
+  }
+});
+
+// Render tự gán PORT qua biến môi trường — không được hardcode 3000 khi deploy thật
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server đang chạy ở cổng ${PORT}`);
+});
+
+    const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+
+    // Thay cho waitForTimeout (đã bị xoá): chờ có thẻ h3 xuất hiện, không quăng lỗi nếu quá giờ
+    await page.waitForSelector("h3", { timeout: 8000 }).catch(() => null);
+
     const results = await page.evaluate(() => {
       const items = [];
       // Google hay đổi class layout theo thời gian/khu vực -> gom nhiều selector khả dĩ
